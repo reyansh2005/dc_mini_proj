@@ -142,17 +142,28 @@ npm run build
 
 ### Backend
 ```bash
-# Compile Java files
-javac Server.java LoadBalancer.java Client.java
+# Prerequisites
+# Place the required runtime jars in the `backend/` directory (example names used below):
+# - sqlite-jdbc-3.45.2.0.jar
+# - slf4j-api-2.0.13.jar
+# - slf4j-simple-2.0.13.jar
 
-# Run server
-java Server <port>
+# Compile Java sources (Windows example using `;` classpath separator)
+cd backend
+javac -cp ".;sqlite-jdbc-3.45.2.0.jar;slf4j-api-2.0.13.jar;slf4j-simple-2.0.13.jar" Server.java LoadBalancer.java Client.java
 
-# Run load balancer
-java LoadBalancer <port>
+# Run the server (example port 2001). Replace `2001` with the desired port.
+java -cp ".;sqlite-jdbc-3.45.2.0.jar;slf4j-api-2.0.13.jar;slf4j-simple-2.0.13.jar" Server 2001
 
-# Run client
-java Client <server-host> <port>
+# Run the load balancer (example using port 3000)
+java -cp ".;sqlite-jdbc-3.45.2.0.jar;slf4j-api-2.0.13.jar;slf4j-simple-2.0.13.jar" LoadBalancer 3000
+
+# Run a client and connect to the server (example connecting to localhost:2001)
+java -cp ".;sqlite-jdbc-3.45.2.0.jar;slf4j-api-2.0.13.jar;slf4j-simple-2.0.13.jar" Client localhost 2001
+
+# Notes
+- The commands above use the Windows classpath separator (`;`). On macOS/Linux use `:` instead.
+- If your project files are in a different package or folder layout, adjust the `javac`/`java` classpath and main class names accordingly.
 ```
 
 ## System Requirements

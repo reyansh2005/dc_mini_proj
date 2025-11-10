@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontend Test Page</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        h1 { text-align: center; margin-bottom: 30px; }
+        .test-item {
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .test-item h3 {
+            margin: 0 0 10px 0;
+            color: #00ff88;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.pass { background: #00ff88; color: #000; }
+        .status.fail { background: #ff4757; color: #fff; }
+        .status.pending { background: #ffa500; color: #000; }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { opacity: 0.8; }
+        .log {
+            background: #000;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .link {
+            color: #00ff88;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Distributed File System Frontend Test</h1>
+        
+        <div class="test-item">
+            <h3>Frontend Files Status</h3>
+            <p id="filesStatus">Testing...</p>
+            <div id="filesList"></div>
+        </div>
+
+        <div class="test-item">
+            <h3>JavaScript Components</h3>
+            <p id="jsStatus">Testing...</p>
+            <div id="componentsList"></div>
+        </div>
+
+        <div class="test-item">
+            <h3>WebSocket Connection Test</h3>
+            <p id="wsStatus">Ready to test</p>
+            <button onclick="testWebSocket()">Test WebSocket Connection</button>
+            <div class="log" id="wsLog" style="display:none;"></div>
+        </div>
+
+        <div class="test-item">
+            <h3>Browser Compatibility</h3>
+            <p id="browserStatus">Testing...</p>
+            <div id="browserInfo"></div>
+        </div>
+
+        <div class="test-item">
+            <h3>Launch Application</h3>
+            <p>If all tests pass, you can launch the main application:</p>
+            <a href="index.html" class="link">🚀 Open Distributed File System</a>
+        </div>
+
+        <div class="test-item">
+            <h3>Quick Actions</h3>
+            <button onclick="window.location.reload()">🔄 Refresh Tests</button>
+            <button onclick="openDevTools()">🔧 Open Developer Tools</button>
+            <button onclick="showSystemInfo()">📊 System Information</button>
+        </div>
+    </div>
+
+    <script>
+        let log = [];
+
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            log.push(`[${timestamp}] ${type.toUpperCase()}: ${message}`);
+            console.log(message);
+        }
+
+        function updateStatus(elementId, status, message) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.innerHTML = `<span class="status ${status}">${status.toUpperCase()}</span> ${message}`;
+            }
+        }
+
+        function testFileAvailability() {
+            const requiredFiles = [
+                'index.html',
+                'styles/main.css',
+                'styles/components.css', 
+                'styles/animations.css',
+                'scripts/websocket.js',
+                'scripts/fileOperations.js',
+                'scripts/visualization.js',
+                'scripts/ui.js',
+                'scripts/app.js'
+            ];
+
+            let passedCount = 0;
+            let totalCount = requiredFiles.length;
+            let results = [];
+
+            const checkFile = async (file) => {
+                try {
+                    const response = await fetch(file, { method: 'HEAD' });
+                    if (response.ok) {
+                        passedCount++;
+                        results.push(`✅ ${file}`);
+                        addLog(`File available: ${file}`, 'success');
+                    } else {
+                        results.push(`❌ ${file} (${response.status})`);
+                        addLog(`File missing: ${file}`, 'error');
+                    }
+                } catch (error) {
+                    results.push(`❌ ${file} (Network Error)`);
+                    addLog(`File error: ${file} - ${error.message}`, 'error');
+                }
+
+                if (results.length === totalCount) {
+                    const status = passedCount === totalCount ? 'pass' : 'fail';
+                    updateStatus('filesStatus', status, `${passedCount}/${totalCount} files available`);
+                    document.getElementById('filesList').innerHTML = results.map(r => `<div>${r}</div>`).join('');
+                }
+            };
+
+            requiredFiles.forEach(checkFile);
+        }
+
+        function testJavaScriptComponents() {
+            // Wait a bit for potential script loading
+            setTimeout(() => {
+                const components = [
+                    { name: 'WebSocketManager', check: () => typeof WebSocketManager !== 'undefined' },
+                    { name: 'FileOperationsManager', check: () => typeof FileOperationsManager !== 'undefined' },
+                    { name: 'ServerMonitor', check: () => typeof ServerMonitor !== 'undefined' },
+                    { name: 'LoadBalancerVisualizer', check: () => typeof LoadBalancerVisualizer !== 'undefined' },
+                    { name: 'ElectionVisualizer', check: () => typeof ElectionVisualizer !== 'undefined' },
+                    { name: 'LogicalClockManager', check: () => typeof LogicalClockManager !== 'undefined' },
+                    { name: 'ToastManager', check: () => typeof ToastManager !== 'undefined' },
+                    { name: 'LoggerSystem', check: () => typeof LoggerSystem !== 'undefined' }
+                ];
+
+                let passedCount = 0;
+                let results = [];
+
+                components.forEach(component => {
+                    try {
+                        if (component.check()) {
+                            passedCount++;
+                            results.push(`✅ ${component.name}`);
+                            addLog(`Component available: ${component.name}`, 'success');
+                        } else {
+                            results.push(`❌ ${component.name}`);
+                            addLog(`Component missing: ${component.name}`, 'error');
+                        }
+                    } catch (error) {
+                        results.push(`❌ ${component.name} (Error)`);
+                        addLog(`Component error: ${component.name} - ${error.message}`, 'error');
+                    }
+                });
+
+                const status = passedCount === components.length ? 'pass' : 'fail';
+                updateStatus('jsStatus', status, `${passedCount}/${components.length} components loaded`);
+                document.getElementById('componentsList').innerHTML = results.map(r => `<div>${r}</div>`).join('');
+            }, 500);
+        }
+
+        function testWebSocket() {
+            const wsLog = document.getElementById('wsLog');
+            wsLog.style.display = 'block';
+            wsLog.innerHTML = '';
+            
+            function logWS(message) {
+                wsLog.innerHTML += message + '\n';
+                wsLog.scrollTop = wsLog.scrollHeight;
+                addLog(message, 'ws');
+            }
+
+            updateStatus('wsStatus', 'pending', 'Testing WebSocket connection...');
+            logWS('Attempting to connect to ws://localhost:12345...');
+
+            const ws = new WebSocket('ws://localhost:12345');
+            let connected = false;
+
+            const timeout = setTimeout(() => {
+                if (!connected) {
+                    logWS('❌ Connection timeout (10 seconds)');
+                    logWS('Make sure your backend server is running!');
+                    updateStatus('wsStatus', 'fail', 'Connection failed - Backend not running');
+                    ws.close();
+                }
+            }, 10000);
+
+            ws.onopen = () => {
+                connected = true;
+                clearTimeout(timeout);
+                logWS('✅ WebSocket connection established!');
+                logWS('Sending test message...');
+                ws.send('TEST_CONNECTION');
+                updateStatus('wsStatus', 'pass', 'WebSocket connection successful');
+            };
+
+            ws.onmessage = (event) => {
+                logWS(`📨 Received: ${event.data}`);
+            };
+
+            ws.onclose = (event) => {
+                if (connected) {
+                    logWS(`🔌 Connection closed normally (code: ${event.code})`);
+                } else {
+                    logWS(`❌ Connection failed (code: ${event.code})`);
+                    updateStatus('wsStatus', 'fail', 'Connection failed - Check backend server');
+                }
+            };
+
+            ws.onerror = (error) => {
+                logWS(`❌ WebSocket error: ${error.type}`);
+                clearTimeout(timeout);
+                updateStatus('wsStatus', 'fail', 'Connection error');
+            };
+
+            // Close connection after 15 seconds
+            setTimeout(() => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    logWS('🔌 Closing test connection...');
+                    ws.close();
+                }
+            }, 15000);
+        }
+
+        function testBrowserCompatibility() {
+            const features = [
+                { name: 'WebSocket API', check: () => 'WebSocket' in window },
+                { name: 'File API', check: () => 'File' in window && 'FileReader' in window },
+                { name: 'Blob API', check: () => 'Blob' in window },
+                { name: 'ES6 Support', check: () => { try { eval('const x = () => {}'); return true; } catch(e) { return false; } } },
+                { name: 'CSS Grid', check: () => CSS.supports('display', 'grid') },
+                { name: 'CSS Custom Properties', check: () => CSS.supports('color', 'var(--test)') },
+                { name: 'Fetch API', check: () => 'fetch' in window },
+                { name: 'Local Storage', check: () => 'localStorage' in window }
+            ];
+
+            let passedCount = 0;
+            let results = [];
+
+            features.forEach(feature => {
+                try {
+                    if (feature.check()) {
+                        passedCount++;
+                        results.push(`✅ ${feature.name}`);
+                        addLog(`Browser feature supported: ${feature.name}`, 'success');
+                    } else {
+                        results.push(`❌ ${feature.name}`);
+                        addLog(`Browser feature missing: ${feature.name}`, 'error');
+                    }
+                } catch (error) {
+                    results.push(`❌ ${feature.name} (Test Error)`);
+                    addLog(`Browser feature test error: ${feature.name}`, 'error');
+                }
+            });
+
+            const status = passedCount === features.length ? 'pass' : (passedCount >= features.length * 0.8 ? 'pending' : 'fail');
+            updateStatus('browserStatus', status, `${passedCount}/${features.length} features supported`);
+            
+            const browserInfo = `
+                <div><strong>Browser:</strong> ${navigator.userAgent}</div>
+                <div><strong>Platform:</strong> ${navigator.platform}</div>
+                <div><strong>Language:</strong> ${navigator.language}</div>
+                <div><strong>Online:</strong> ${navigator.onLine ? 'Yes' : 'No'}</div>
+                <div><strong>Cookies:</strong> ${navigator.cookieEnabled ? 'Enabled' : 'Disabled'}</div>
+                <div style="margin-top: 10px;">${results.map(r => `<div>${r}</div>`).join('')}</div>
+            `;
+            document.getElementById('browserInfo').innerHTML = browserInfo;
+        }
+
+        function openDevTools() {
+            addLog('Opening developer tools...', 'info');
+            // This won't actually open dev tools, but will log the instruction
+            alert('Please press F12 or right-click and select "Inspect Element" to open developer tools.');
+        }
+
+        function showSystemInfo() {
+            const info = {
+                timestamp: new Date().toISOString(),
+                url: window.location.href,
+                screen: `${screen.width}x${screen.height}`,
+                viewport: `${window.innerWidth}x${window.innerHeight}`,
+                pixelRatio: window.devicePixelRatio,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                memory: navigator.deviceMemory ? `${navigator.deviceMemory} GB` : 'Unknown',
+                cores: navigator.hardwareConcurrency || 'Unknown',
+                connection: navigator.connection ? navigator.connection.effectiveType : 'Unknown'
+            };
+
+            const infoText = JSON.stringify(info, null, 2);
+            console.log('System Information:', info);
+            
+            const blob = new Blob([infoText], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'system-info.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            addLog('System information downloaded', 'info');
+        }
+
+        // Run tests on page load
+        window.addEventListener('load', () => {
+            addLog('Starting frontend tests...', 'info');
+            testFileAvailability();
+            testJavaScriptComponents();
+            testBrowserCompatibility();
+            addLog('Tests completed. Review results above.', 'info');
+        });
+
+        // Service worker registration for offline support (optional)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                // Note: You would need to create a sw.js file for this to work
+                // navigator.serviceWorker.register('/sw.js')
+                //     .then(reg => addLog('Service Worker registered', 'info'))
+                //     .catch(err => addLog('Service Worker registration failed', 'warning'));
+            });
+        }
+    </script>
+</body>
+</html>

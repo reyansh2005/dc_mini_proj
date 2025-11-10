@@ -1,0 +1,537 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+backup.db
+Client.class
+Client.java
+downloaded_test.txt
+LoadBalancer.class
+LoadBalancer.java
+rey.txt
+Server.class
+Server.java
+Server$ClientHandler.class
+shared.db
+ShowDBs.ps1
+slf4j-api-2.0.13.jar
+slf4j-simple-2.0.13.jar
+sqlite-jdbc-3.45.2.0.jar
+sqlite3.exe
+WebSocketServer.class
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="Client.java">
+import java.io.*;
+import java.net.*;
+import java.util.Scanner;
+
+public class Client {
+    private static int clientId = -1;
+    private static String lastRequestedFile = null;
+
+    public static void main(String[] args) {
+        try (Socket socket = new Socket("127.0.0.1", 12345); // connect to LoadBalancer
+             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+             Scanner scanner = new Scanner(System.in)) {
+
+            // Listener thread
+            new Thread(() -> {
+                try {
+                    String msg;
+                    while ((msg = in.readLine()) != null) {
+                        if (msg.startsWith("ASSIGN_ID")) {
+                            clientId = Integer.parseInt(msg.split(" ")[1]);
+                            System.out.println("[CLIENT] Connected. Assigned clientId = " + clientId);
+                        } else if (msg.startsWith("COORDINATOR")) {
+                            System.out.println(msg.substring(12));
+                        } else if (msg.startsWith("FILE File not found")) {
+                            System.out.println("File not found.");
+                        } else if (msg.startsWith("FILE ")) {
+                            String content = msg.substring(5);
+                            try {
+                                String fname = (lastRequestedFile != null) ? lastRequestedFile : "downloaded_file.txt";
+                                FileOutputStream fos = new FileOutputStream("downloaded_" + fname);
+                                fos.write(content.getBytes());
+                                fos.close();
+                                System.out.println("File '" + fname + "' saved as downloaded_" + fname);
+                            } catch (IOException e) {
+                                System.out.println("Error saving file.");
+                            }
+                        } else {
+                            System.out.println(msg);
+                        }
+                    }
+                } catch (IOException e) {
+                    System.out.println("[CLIENT] Connection closed.");
+                }
+            }).start();
+
+            // Menu
+            while (true) {
+                System.out.println("\nMenu:");
+                System.out.println("1) Upload file");
+                System.out.println("2) Download file");
+                System.out.println("3) View file");
+                System.out.println("4) Delete file");
+                System.out.println("5) Show Coordinator");
+                System.out.println("6) Exit");
+                System.out.print("Choice: ");
+                String choice = scanner.nextLine();
+
+                if ("1".equals(choice)) {
+                    System.out.print("Enter local file path: ");
+                    String path = scanner.nextLine();
+                    File f = new File(path);
+                    if (!f.exists()) {
+                        System.out.println("File not found!");
+                        continue;
+                    }
+                    String content = new String(java.nio.file.Files.readAllBytes(f.toPath()));
+                    out.println("upload " + f.getName() + "::" + content);
+                } else if ("2".equals(choice)) {
+                    System.out.print("Enter filename to download: ");
+                    String fname = scanner.nextLine();
+                    lastRequestedFile = fname;
+                    out.println("download " + fname);
+                } else if ("3".equals(choice)) {
+                    System.out.print("Enter filename to view: ");
+                    out.println("view " + scanner.nextLine());
+                } else if ("4".equals(choice)) {
+                    System.out.print("Enter filename to delete: ");
+                    out.println("delete " + scanner.nextLine());
+                } else if ("5".equals(choice)) {
+                    out.println("coordinator");
+                } else if ("6".equals(choice)) {
+                    out.println("exit");
+                    break;
+                } else {
+                    System.out.println("Invalid choice.");
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+</file>
+
+<file path="downloaded_test.txt">
+My pincher collar is snapped on. Then comes the electric zapper collar. Finally, my purple at-home collar is taken off and I know I’m going for a walk to the dog park. I’m so excited to see my friends. I hope Spike or Thunder are there already. They're the most fun to chase and tumble with. My human is pretty strict with me. I’m only allowed on the grass and not on the sidewalks. I think she’s afraid I’m going to jump on the other humans. I don’t understand why everyone else gets to jump on the benches and run wild on the sidewalks. They don’t listen to their humans. I know I could ignore mine but if I do she may zap me and it’s just not worth it. She probably wouldn’t let me back at the dog park if I didn’t listen to her. I just love the dog park.
+</file>
+
+<file path="LoadBalancer.java">
+import java.io.*;
+import java.net.*;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class LoadBalancer {
+    private static final int LB_PORT = 12345;
+    private static final List<InetSocketAddress> servers = new ArrayList<>();
+    private static final Map<InetSocketAddress, Integer> activeConnections = new ConcurrentHashMap<>();
+    private static int nextClientId = 1; // Centralized client ID
+
+    public static void main(String[] args) {
+        // Add backend servers
+        servers.add(new InetSocketAddress("127.0.0.1", 2001));
+        servers.add(new InetSocketAddress("127.0.0.1", 2002));
+        servers.add(new InetSocketAddress("127.0.0.1", 2003));
+
+        for (InetSocketAddress server : servers) {
+            activeConnections.put(server, 0);
+        }
+
+        try (ServerSocket serverSocket = new ServerSocket(LB_PORT)) {
+            System.out.println("[LoadBalancer] Running on port " + LB_PORT);
+
+            while (true) {
+                Socket clientSocket = serverSocket.accept();
+                InetSocketAddress targetServer = getLeastConnectedServer();
+                activeConnections.put(targetServer, activeConnections.get(targetServer) + 1);
+
+                int assignedClientId;
+                synchronized (LoadBalancer.class) {
+                    assignedClientId = nextClientId++;
+                }
+                new Thread(() -> handleClient(clientSocket, targetServer, assignedClientId)).start();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static InetSocketAddress getLeastConnectedServer() {
+        return servers.stream()
+                .min(Comparator.comparingInt(activeConnections::get))
+                .orElse(servers.get(0));
+    }
+
+    private static void handleClient(Socket clientSocket, InetSocketAddress serverAddr, int clientId) {
+        try (Socket serverSocket = new Socket(serverAddr.getHostName(), serverAddr.getPort())) {
+            // Send clientId as the first message to the server
+            PrintWriter serverOut = new PrintWriter(serverSocket.getOutputStream(), true);
+            serverOut.println(clientId);
+
+            Thread t1 = new Thread(() -> forwardData(clientSocket, serverSocket));
+            Thread t2 = new Thread(() -> forwardData(serverSocket, clientSocket));
+            t1.start(); t2.start();
+            t1.join(); t2.join();
+        } catch (Exception e) {
+            System.out.println("[LoadBalancer] Connection failed: " + e.getMessage());
+        } finally {
+            activeConnections.put(serverAddr, activeConnections.get(serverAddr) - 1);
+        }
+    }
+
+    private static void forwardData(Socket src, Socket dest) {
+        try (InputStream in = src.getInputStream(); OutputStream out = dest.getOutputStream()) {
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = in.read(buffer)) != -1) {
+                out.write(buffer, 0, bytesRead);
+                out.flush();
+            }
+        } catch (IOException ignored) {}
+    }
+}
+</file>
+
+<file path="rey.txt">
+import java.io.*;
+import java.net.*;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class LoadBalancer {
+    private static final int LB_PORT = 12345;
+    private static final List<InetSocketAddress> servers = new ArrayList<>();
+    private static final Map<InetSocketAddress, Integer> activeConnections = new ConcurrentHashMap<>();
+    private static int nextClientId = 1; // Centralized client ID
+
+    public static void main(String[] args) {
+        // Add backend servers
+        servers.add(new InetSocketAddress("127.0.0.1", 2001));
+        servers.add(new InetSocketAddress("127.0.0.1", 2002));
+        servers.add(new InetSocketAddress("127.0.0.1", 2003));
+
+        for (InetSocketAddress server : servers) {
+            activeConnections.put(server, 0);
+        }
+
+        try (ServerSocket serverSocket = new ServerSocket(LB_PORT)) {
+            System.out.println("[LoadBalancer] Running on port " + LB_PORT);
+
+            while (true) {
+                Socket clientSocket = serverSocket.accept();
+                InetSocketAddress targetServer = getLeastConnectedServer();
+                activeConnections.put(targetServer, activeConnections.get(targetServer) + 1);
+
+                int assignedClientId;
+                synchronized (LoadBalancer.class) {
+                    assignedClientId = nextClientId++;
+                }
+                new Thread(() -> handleClient(clientSocket, targetServer, assignedClientId)).start();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static InetSocketAddress getLeastConnectedServer() {
+        return servers.stream()
+                .min(Comparator.comparingInt(activeConnections::get))
+                .orElse(servers.get(0));
+    }
+
+    private static void handleClient(Socket clientSocket, InetSocketAddress serverAddr, int clientId) {
+        try (Socket serverSocket = new Socket(serverAddr.getHostName(), serverAddr.getPort())) {
+            // Send clientId as the first message to the server
+            PrintWriter serverOut = new PrintWriter(serverSocket.getOutputStream(), true);
+            serverOut.println(clientId);
+
+            Thread t1 = new Thread(() -> forwardData(clientSocket, serverSocket));
+            Thread t2 = new Thread(() -> forwardData(serverSocket, clientSocket));
+            t1.start(); t2.start();
+            t1.join(); t2.join();
+        } catch (Exception e) {
+            System.out.println("[LoadBalancer] Connection failed: " + e.getMessage());
+        } finally {
+            activeConnections.put(serverAddr, activeConnections.get(serverAddr) - 1);
+        }
+    }
+
+    private static void forwardData(Socket src, Socket dest) {
+        try (InputStream in = src.getInputStream(); OutputStream out = dest.getOutputStream()) {
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = in.read(buffer)) != -1) {
+                out.write(buffer, 0, bytesRead);
+                out.flush();
+            }
+        } catch (IOException ignored) {}
+    }
+}
+</file>
+
+<file path="Server.java">
+import java.io.*;
+import java.net.*;
+import java.sql.*;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class Server {
+    private static Map<Integer, PrintWriter> clients = new ConcurrentHashMap<>();
+    private static int coordinatorId = -1;
+    private static int logicalClock = 0;
+
+    private static Connection sharedConn; // Use a single shared DB
+
+    public static void main(String[] args) {
+        if (args.length < 1) {
+            System.out.println("Usage: java Server <port>");
+            return;
+        }
+        int PORT = Integer.parseInt(args[0]);
+
+        try {
+            Class.forName("org.sqlite.JDBC");
+            sharedConn = DriverManager.getConnection("jdbc:sqlite:shared.db"); // Shared DB for all servers
+            initDatabase(sharedConn);
+
+            try (ServerSocket serverSocket = new ServerSocket(PORT)) {
+                System.out.println("[Server] Started on port " + PORT);
+
+                while (true) {
+                    Socket socket = serverSocket.accept();
+                    new Thread(new ClientHandler(socket)).start();
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void initDatabase(Connection conn) throws SQLException {
+        Statement stmt = conn.createStatement();
+        stmt.execute("CREATE TABLE IF NOT EXISTS documents (" +
+                     "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                     "name TEXT UNIQUE," +
+                     "content TEXT)");
+        stmt.close();
+    }
+
+    private static synchronized void startElection() {
+        if (clients.isEmpty()) {
+            coordinatorId = -1;
+            return;
+        }
+        coordinatorId = Collections.max(clients.keySet());
+        broadcast("[ELECTION] Coordinator is now Client " + coordinatorId);
+        System.out.println("[Server] Coordinator is now Client " + coordinatorId);
+    }
+
+    private static void broadcast(String msg) {
+        for (PrintWriter pw : clients.values()) {
+            pw.println("COORDINATOR " + msg);
+        }
+    }
+
+    private static class ClientHandler implements Runnable {
+        private Socket socket;
+        private int clientId;
+        private BufferedReader in;
+        private PrintWriter out;
+
+        public ClientHandler(Socket socket) {
+            this.socket = socket;
+        }
+
+        @Override
+        public void run() {
+            try {
+                in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                out = new PrintWriter(socket.getOutputStream(), true);
+
+                // Read clientId from LoadBalancer as the first message
+                String idLine = in.readLine();
+                clientId = Integer.parseInt(idLine.trim());
+                clients.put(clientId, out);
+
+                System.out.println("[Server] Client " + clientId + " connected.");
+                startElection();
+
+                out.println("ASSIGN_ID " + clientId);
+
+                String line;
+                while ((line = in.readLine()) != null) {
+                    handleCommand(line);
+                }
+            } catch (IOException e) {
+                System.out.println("[Server] Connection closed for client " + clientId);
+            } finally {
+                try { socket.close(); } catch (IOException ignored) {}
+                clients.remove(clientId);
+                startElection();
+            }
+        }
+
+        private void handleCommand(String line) {
+            try {
+                logicalClock++;
+                String[] parts = line.split(" ", 2);
+                String cmd = parts[0];
+
+                if ("upload".equalsIgnoreCase(cmd)) {
+                    String[] tokens = parts[1].split("::", 2);
+                    if (tokens.length < 2) {
+                        out.println("ERROR Invalid upload format.");
+                        return;
+                    }
+                    String filename = tokens[0].trim();
+                    String content = tokens[1];
+
+                    upsertFile(sharedConn, filename, content);
+
+                    backupDatabase(); // <-- Add this line
+
+                    out.println("OK Upload of '" + filename + "' replicated | clock=" + logicalClock);
+
+                } else if ("download".equalsIgnoreCase(cmd)) {
+                    String filename = parts[1].trim();
+                    String content = fetchFile(sharedConn, filename);
+                    out.println(content != null ? "FILE " + content : "FILE File not found.");
+
+                } else if ("view".equalsIgnoreCase(cmd)) {
+                    String filename = parts[1].trim();
+                    String content = fetchFile(sharedConn, filename);
+                    out.println(content != null ? "VIEW --- " + filename + " ---\n" + content : "VIEW File not found.");
+
+                } else if ("delete".equalsIgnoreCase(cmd)) {
+                    String filename = parts[1].trim();
+                    deleteFile(sharedConn, filename);
+                    out.println("DEL File '" + filename + "' deleted.");
+
+                } else if ("coordinator".equalsIgnoreCase(cmd)) {
+                    out.println("COORD Current Coordinator: Client " + coordinatorId);
+
+                } else if ("exit".equalsIgnoreCase(cmd)) {
+                    out.println("BYE Goodbye!");
+                    socket.close();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        private void upsertFile(Connection conn, String filename, String content) throws SQLException {
+            PreparedStatement ps = conn.prepareStatement(
+                "INSERT INTO documents(name, content) VALUES(?, ?) " +
+                "ON CONFLICT(name) DO UPDATE SET content=excluded.content");
+            ps.setString(1, filename);
+            ps.setString(2, content);
+            ps.executeUpdate();
+            ps.close();
+        }
+
+        private String fetchFile(Connection conn, String filename) throws SQLException {
+            PreparedStatement ps = conn.prepareStatement("SELECT content FROM documents WHERE name=?");
+            ps.setString(1, filename);
+            ResultSet rs = ps.executeQuery();
+            String result = rs.next() ? rs.getString("content") : null;
+            rs.close();
+            ps.close();
+            return result;
+        }
+
+        private void deleteFile(Connection conn, String filename) throws SQLException {
+            PreparedStatement ps = conn.prepareStatement("DELETE FROM documents WHERE name=?");
+            ps.setString(1, filename);
+            ps.executeUpdate();
+            ps.close();
+        }
+    }
+
+    private static void backupDatabase() {
+        try (InputStream in = new FileInputStream("shared.db");
+         OutputStream out = new FileOutputStream("backup.db")) {
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = in.read(buffer)) != -1) {
+                out.write(buffer, 0, bytesRead);
+            }
+        } catch (IOException e) {
+            System.out.println("[Server] Backup failed: " + e.getMessage());
+        }
+    }
+}
+</file>
+
+<file path="ShowDBs.ps1">
+# ShowDBs.ps1
+# Quick demonstration of primary.db and backup.db contents
+
+# Path to sqlite3 executable
+$sqliteExe = ".\sqlite3.exe"
+
+# Function to display DB contents
+function Show-DB($dbFile) {
+    if (Test-Path $dbFile) {
+        Write-Host "`n=== Contents of $dbFile ===`n" -ForegroundColor Cyan
+        & $sqliteExe $dbFile "SELECT * FROM documents;"
+    } else {
+        Write-Host "`n❌ $dbFile not found!" -ForegroundColor Red
+    }
+}
+
+# Show both databases
+Show-DB "primary.db"
+Show-DB "backup.db"
+
+Write-Host "`n✅ Done showing both databases.`n" -ForegroundColor Green
+</file>
+
+</files>
